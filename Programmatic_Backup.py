@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python -u
 
 import sys
 import argparse
@@ -26,6 +26,7 @@ def process_args():
    parser.add_argument("-V", "--Verbose", action='count', help="Verbose level")
    parser.add_argument("-S", "--TLS", action="store_true", help="Connect using HTTPS/TLS")
    parser.add_argument("-E", "--Explain", action="store_true", help="System Should Explain what is is doing, AKA Verbose")
+   parser.add_argument("--TestMode", help="Put the receiver into TestMode to do the backup/restore. Value provided is the test mode password")
    parser.add_argument("--Restore", type=argparse.FileType('r'), help="Restore backup from a file")
 
    args=parser.parse_args()
@@ -38,6 +39,11 @@ def process_args():
    Verbose=args.Verbose
    Restore=args.Restore!=None
    Restore_File=args.Restore
+   TestMode=args.TestMode!=None
+   if TestMode:
+      TestMode_Password=args.TestMode
+   else:
+      TestMode_Password=""
 
    if args.Explain:
        if Restore:
@@ -53,7 +59,13 @@ def process_args():
            TLS,
            Verbose))
 
-   return (Host,Port,User,Password,TLS,Verbose,Restore,Restore_File)
+       sys.stderr.write("Test Mode: {}:{}\n".format(
+           TestMode,
+           TestMode_Password))
+
+
+
+   return (Host,Port,User,Password,TLS,Verbose,Restore,Restore_File,TestMode,TestMode_Password)
 
 def create_base_programmatic_URL (Host,Port,User,Password,TLS):
 
@@ -77,7 +89,8 @@ def get_URL(Base_URL,item):
    global Verbose
    get_url=Base_URL+'show?'+item
    if Verbose >= 2:
-      print get_url
+      sys.stderr.write(get_url)
+      sys.stderr.write("\n")
    return get_url
 
 
@@ -160,13 +173,14 @@ def get_all_sessions(Base_URL):
 
 
 
-def Backup_Receiver(Host,Port,User,Password,TLS):
+def Backup_Receiver_Standard(Host,Port,User,Password,TLS):
    Base_URL=create_base_programmatic_URL (Host,Port,User,Password,TLS)
 
    print "# {}:{}".format(Host,Port)
    print "# "+str(datetime.datetime.now())
    get_prog_item(Base_URL,"SerialNumber",True)
    get_prog_item(Base_URL,"FirmwareVersion",True)
+   get_prog_item(Base_URL,"SystemName")
 
    get_prog_item(Base_URL,"ElevationMask")
    get_prog_item(Base_URL,"SystemName")
@@ -187,17 +201,35 @@ def Backup_Receiver(Host,Port,User,Password,TLS):
    get_prog_item(Base_URL,"RefStation")
    get_prog_item(Base_URL,"RtkControls")
    get_prog_item(Base_URL,"GlonassSatControls")
-#   get_prog_item(Base_URL,"Sessions")
+#   get_prog_item(Base_URL,"NtpServer") Set only today
 #   get_prog_item(Base_URL,"Autodelete")
    get_all_sessions(Base_URL)
    get_all_ports(Base_URL)
+
+
+def Backup_Receiver_TestMode_Only(Host,Port,User,Password,TLS):
+   Base_URL=create_base_programmatic_URL (Host,Port,User,Password,TLS)
+   get_prog_item(Base_URL,"Security",True)
+
+   get_prog_item(Base_URL,"FtpPush",True) #Need to fix the directory stuff.
+   get_prog_item(Base_URL,"EmailAlerts")
+   get_prog_item(Base_URL,"HttpPorts")
+#   get_prog_item(Base_URL,"PPP")
+   get_prog_item(Base_URL,"Ethernet",True) #Needs mac=00:60:35:10:33:84 removed
+   get_prog_item(Base_URL,"NtripClient",True) # Needs port removed
+# Note that NTRIP only supports 1 item, but it is better than nothing
+   get_prog_item(Base_URL,"NtripServer")
+   get_prog_item(Base_URL,"Omnistar")
+   get_prog_item(Base_URL,"SystemMode")
+   get_prog_item(Base_URL,"HeadingControls")
 
 
 def set_URL(Base_URL,item):
    global Verbose
    get_url=Base_URL+'set?'+item
    if Verbose >= 2:
-      print get_url
+      sys.stderr.write(get_url)
+      sys.stderr.write("\n")
    return get_url
 
 
@@ -208,8 +240,22 @@ def set_prog_item (Base_URL,item):
    return True
 
 
-def Restore_Receiver(Host,Port,User,Password,TLS,Restore_File):
+def Restore_Receiver(Host,Port,User,Password,TLS,Restore_File,TestMode,TestMode_Password):
    Base_URL=create_base_programmatic_URL (Host,Port,User,Password,TLS)
+
+   Need_to_Unset=False
+
+   if In_Test_Mode (Host,Port,User,Password,TLS):
+      Need_to_Unset=False
+   else:
+      if TestMode:
+         if Verbose>=1:
+            sys.stderr.write("Putting the unit in Test Mode\n")
+         if Set_TestMode(Host,Port,User,Password,TLS):
+            if Verbose>=1:
+               sys.stderr.write("Unit put in Test Mode\n")
+      #         if In_Test_Mode (Host,Port,User,Password,TLS):
+            Need_to_Unset=True
 
    for line in Restore_File:
       line=line.rstrip()
@@ -244,7 +290,7 @@ def Restore_Receiver(Host,Port,User,Password,TLS,Restore_File):
             logging.error("Special antenna handling FAILED")
 
       elif words[0]=="RefStation":
-         print line
+#         print line
          match=re.match("RefStation lat=([-0-9.]+) lon=([-0-9.]+) height=([-0-9.]+) Rtcm2Id=(\w+) Rtcm3Id=(\w+) CmrId=(\w+) Name='(.*)' Code='(.*)'",line)
          if match:
 #            print "matched"
@@ -258,7 +304,7 @@ def Restore_Receiver(Host,Port,User,Password,TLS,Restore_File):
                match.group(7),
                match.group(8)
                )
-            print set_Ref
+#            print set_Ref
             logging.debug("Special RefStation handling done: " + set_Ref)
             set_prog_item(Base_URL,set_Ref)
          else:
@@ -269,11 +315,53 @@ def Restore_Receiver(Host,Port,User,Password,TLS,Restore_File):
          set_prog_item(Base_URL,line)
 
 
-(Host,Port,User,Password,TLS,Verbose,Restore,Restore_File) = process_args()
+   if Need_to_Unset:
+      Unset_TestMode(Host,Port,User,Password,TLS)
+      if Verbose>=1:
+         sys.stderr.write("Taking the unit out of Test Mode\n")
+
+
+def In_Test_Mode(Host,Port,User,Password,TLS):
+   Base_URL=create_base_programmatic_URL (Host,Port,User,Password,TLS)
+   get_url=Base_URL+'show?TestMode'
+   r=requests.get(get_url)
+   return r.text.rstrip()=="testMode enable=yes"
+
+def Set_TestMode(Host,Port,User,Password,TLS):
+   Base_URL=create_base_programmatic_URL (Host,Port,User,Password,TLS)
+   get_url=Base_URL+'set?testMode&enable=yes&password='+TestMode_Password
+   r=requests.get(get_url)
+   return r.text.rstrip()=="OK: testMode enable=yes"
+
+def Unset_TestMode(Host,Port,User,Password,TLS):
+   Base_URL=create_base_programmatic_URL (Host,Port,User,Password,TLS)
+   set_url=Base_URL+'set?testMode&enable=no'
+#   if Verbose >= 2:
+#      print get_url
+   r=requests.get(set_url)
+#   print r.text.rstrip()
+
+
+(Host,Port,User,Password,TLS,Verbose,Restore,Restore_File,TestMode,TestMode_Password) = process_args()
 
 if Restore:
-   Restore_Receiver(Host,Port,User,Password,TLS,Restore_File)
+   Restore_Receiver(Host,Port,User,Password,TLS,Restore_File,TestMode,TestMode_Password)
 else:
-   Backup_Receiver(Host,Port,User,Password,TLS)
+   Backup_Receiver_Standard(Host,Port,User,Password,TLS)
+   if In_Test_Mode (Host,Port,User,Password,TLS):
+      Backup_Receiver_TestMode_Only(Host,Port,User,Password,TLS)
+   else:
+      if TestMode:
+         if Verbose>=1:
+            sys.stderr.write("Putting the unit in Test Mode\n")
+         if Set_TestMode(Host,Port,User,Password,TLS):
+            if Verbose>=1:
+               sys.stderr.write("Unit put in Test Mode\n")
+#         if In_Test_Mode (Host,Port,User,Password,TLS):
+            Backup_Receiver_TestMode_Only(Host,Port,User,Password,TLS)
+            Unset_TestMode(Host,Port,User,Password,TLS)
+            if Verbose>=1:
+               sys.stderr.write("Taking the unit out of Test Mode\n")
+
 
 
