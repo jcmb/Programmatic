@@ -99,7 +99,10 @@ def get_prog_item (Base_URL,item, info_only=False):
    if info_only:
       print "# "+ r.text.rstrip()
    else:
-      print r.text.rstrip()
+      if r.text.startswith("ERROR"):
+         print "# "+ r.text.rstrip()
+      else:
+         print r.text.rstrip()
    return True
 
 #def get_URL_port(Base_URL,port):
@@ -180,27 +183,33 @@ def Backup_Receiver_Standard(Host,Port,User,Password,TLS):
    print "# "+str(datetime.datetime.now())
    get_prog_item(Base_URL,"SerialNumber",True)
    get_prog_item(Base_URL,"FirmwareVersion",True)
+   get_prog_item(Base_URL,"firmwareWarranty",True)
    get_prog_item(Base_URL,"SystemName")
 
    get_prog_item(Base_URL,"ElevationMask")
    get_prog_item(Base_URL,"SystemName")
+
    get_prog_item(Base_URL,"PowerControls")
+   get_prog_item(Base_URL,"chargingcontrols")
    get_prog_item(Base_URL,"UPS")
-   get_prog_item(Base_URL,"RtkControls")
+
    get_prog_item(Base_URL,"ReferenceFrequency")
    get_prog_item(Base_URL,"PdopMask")
    get_prog_item(Base_URL,"ClockSteering")
+
    get_prog_item(Base_URL,"GpsSatControls")
    get_prog_item(Base_URL,"SbasSatControls")
    get_prog_item(Base_URL,"QzssSatControls")
-#   get_prog_item(Base_URL,"IrnssSatControls")
-#   get_prog_item(Base_URL,"PPS")
+   get_prog_item(Base_URL,"GlonassSatControls")
+   get_prog_item(Base_URL,"galileoSatControls")
+   get_prog_item(Base_URL,"BeiDouSatControls")
+   get_prog_item(Base_URL,"IrnssSatControls")
    get_prog_item(Base_URL,"Tracking")
    get_prog_item(Base_URL,"Antenna")
    get_prog_item(Base_URL,"MultipathReject")
    get_prog_item(Base_URL,"RefStation")
    get_prog_item(Base_URL,"RtkControls")
-   get_prog_item(Base_URL,"GlonassSatControls")
+#   get_prog_item(Base_URL,"PPS")
 #   get_prog_item(Base_URL,"NtpServer") Set only today
 #   get_prog_item(Base_URL,"Autodelete")
    get_all_sessions(Base_URL)
@@ -222,6 +231,7 @@ def Backup_Receiver_TestMode_Only(Host,Port,User,Password,TLS):
    get_prog_item(Base_URL,"Omnistar")
    get_prog_item(Base_URL,"SystemMode")
    get_prog_item(Base_URL,"HeadingControls")
+   get_prog_item(Base_URL,"sessions")
 
 
 def set_URL(Base_URL,item):
