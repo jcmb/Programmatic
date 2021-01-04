@@ -1,4 +1,5 @@
 #!/usr/bin/env python -u
+from __future__ import print_function
 
 import sys
 import argparse
@@ -8,7 +9,6 @@ import requests
 import logging
 import re
 import datetime
-
 
 Verbose=0
 
@@ -27,7 +27,8 @@ def process_args():
    parser.add_argument("-S", "--TLS", action="store_true", help="Connect using HTTPS/TLS")
    parser.add_argument("-E", "--Explain", action="store_true", help="System Should Explain what is is doing, AKA Verbose")
    parser.add_argument("--TestMode", help="Put the receiver into TestMode to do the backup/restore. Value provided is the test mode password")
-   parser.add_argument("--Restore", type=argparse.FileType('r'), help="Restore backup from a file")
+   parser.add_argument("-R","--Restore", type=argparse.FileType('r'), help="Restore backup from a file")
+   parser.add_argument("-O","--Output", type=argparse.FileType('w'), default="-", help="Save backup to file")
 
    args=parser.parse_args()
 
@@ -38,6 +39,7 @@ def process_args():
    TLS=args.TLS
    Verbose=args.Verbose
    Restore=args.Restore!=None
+   Output_File=args.Output
    Restore_File=args.Restore
    TestMode=args.TestMode!=None
    if TestMode:
@@ -50,7 +52,7 @@ def process_args():
           sys.stderr.write("Restoring from: {}\n".format(
             Restore_File.name))
        else:
-          sys.stderr.write("Backing Up\n")
+          sys.stderr.write("Backing Up to {}\n".format(Output_File.name))
        sys.stderr.write("GNSS Receiver: {}:{},  User: {}, Password: {} TLS: {} Verbose: {}\n".format(
            Host,
            Port,
@@ -65,7 +67,7 @@ def process_args():
 
 
 
-   return (Host,Port,User,Password,TLS,Verbose,Restore,Restore_File,TestMode,TestMode_Password)
+   return (Host,Port,User,Password,TLS,Verbose,Output_File,Restore,Restore_File,TestMode,TestMode_Password)
 
 def create_base_programmatic_URL (Host,Port,User,Password,TLS):
 
@@ -94,15 +96,15 @@ def get_URL(Base_URL,item):
    return get_url
 
 
-def get_prog_item (Base_URL,item, info_only=False):
+def get_prog_item (Base_URL, Output_File, item, info_only=False):
    r=requests.get(get_URL(Base_URL,item))
    if info_only:
-      print "# "+ r.text.rstrip()
+      print ("# "+ r.text.rstrip(),file=Output_File)
    else:
       if r.text.startswith("ERROR"):
-         print "# "+ r.text.rstrip()
+         print ("# "+ r.text.rstrip(),file=Output_File)
       else:
-         print r.text.rstrip()
+         print (r.text.rstrip(),file=Output_File)
    return True
 
 #def get_URL_port(Base_URL,port):
@@ -117,7 +119,7 @@ def get_prog_item (Base_URL,item, info_only=False):
 #   print r.text
 #   return True
 
-def get_all_ports(Base_URL):
+def get_all_ports(Base_URL,Output_File):
 #   find_port = re.compile("IoPort port=(\w*)")
    r=requests.get(get_URL(Base_URL,"IoPorts"))
    lines=r.text.splitlines()
@@ -140,7 +142,7 @@ def get_all_ports(Base_URL):
 
 
    for line in lines:
-      print line
+      print (line,file=Output_File)
 #      match = find_port.match(line)
 #     if match:
 #         get_prog_port(Base_URL,match.group(1))
@@ -150,7 +152,7 @@ def get_all_ports(Base_URL):
 #   print len(lines)
 #   print(lines)
 
-def get_all_sessions(Base_URL):
+def get_all_sessions(Base_URL,Output_File):
    r=requests.get(get_URL(Base_URL,"Sessions"))
    lines=r.text.splitlines()
 
@@ -171,49 +173,49 @@ def get_all_sessions(Base_URL):
       del(lines[len(lines)-1])
 
    for line in lines:
-      print line.rstrip()
+      print (line.rstrip(),file=Output_File)
 
 
 
 
-def Backup_Receiver_Standard(Host,Port,User,Password,TLS):
+def Backup_Receiver_Standard(Host,Port,User,Password,TLS,Output_File):
    Base_URL=create_base_programmatic_URL (Host,Port,User,Password,TLS)
 
-   print "# {}:{}".format(Host,Port)
-   print "# "+str(datetime.datetime.now())
-   get_prog_item(Base_URL,"SerialNumber",True)
-   get_prog_item(Base_URL,"FirmwareVersion",True)
-   get_prog_item(Base_URL,"firmwareWarranty",True)
-   get_prog_item(Base_URL,"SystemName")
+   print ("# {}:{}".format(Host,Port),file=Output_File)
+   print ("# "+str(datetime.datetime.now()),file=Output_File)
+   get_prog_item(Base_URL,Output_File,"SerialNumber",True)
+   get_prog_item(Base_URL,Output_File,"FirmwareVersion",True)
+   get_prog_item(Base_URL,Output_File,"firmwareWarranty",True)
+   get_prog_item(Base_URL,Output_File,"SystemName")
 
-   get_prog_item(Base_URL,"ElevationMask")
-   get_prog_item(Base_URL,"SystemName")
+   get_prog_item(Base_URL,Output_File,"ElevationMask")
+   get_prog_item(Base_URL,Output_File,"SystemName")
 
-   get_prog_item(Base_URL,"PowerControls")
-   get_prog_item(Base_URL,"chargingcontrols")
-   get_prog_item(Base_URL,"UPS")
+   get_prog_item(Base_URL,Output_File,"PowerControls")
+   get_prog_item(Base_URL,Output_File,"chargingcontrols")
+   get_prog_item(Base_URL,Output_File,"UPS")
 
-   get_prog_item(Base_URL,"ReferenceFrequency")
-   get_prog_item(Base_URL,"PdopMask")
-   get_prog_item(Base_URL,"ClockSteering")
+   get_prog_item(Base_URL,Output_File,"ReferenceFrequency")
+   get_prog_item(Base_URL,Output_File,"PdopMask")
+   get_prog_item(Base_URL,Output_File,"ClockSteering")
 
-   get_prog_item(Base_URL,"GpsSatControls")
-   get_prog_item(Base_URL,"SbasSatControls")
-   get_prog_item(Base_URL,"QzssSatControls")
-   get_prog_item(Base_URL,"GlonassSatControls")
-   get_prog_item(Base_URL,"galileoSatControls")
-   get_prog_item(Base_URL,"BeiDouSatControls")
-   get_prog_item(Base_URL,"IrnssSatControls")
-   get_prog_item(Base_URL,"Tracking")
-   get_prog_item(Base_URL,"Antenna")
-   get_prog_item(Base_URL,"MultipathReject")
-   get_prog_item(Base_URL,"RefStation")
-   get_prog_item(Base_URL,"RtkControls")
-#   get_prog_item(Base_URL,"PPS")
-#   get_prog_item(Base_URL,"NtpServer") Set only today
-#   get_prog_item(Base_URL,"Autodelete")
-   get_all_sessions(Base_URL)
-   get_all_ports(Base_URL)
+   get_prog_item(Base_URL,Output_File,"GpsSatControls")
+   get_prog_item(Base_URL,Output_File,"SbasSatControls")
+   get_prog_item(Base_URL,Output_File,"QzssSatControls")
+   get_prog_item(Base_URL,Output_File,"GlonassSatControls")
+   get_prog_item(Base_URL,Output_File,"galileoSatControls")
+   get_prog_item(Base_URL,Output_File,"BeiDouSatControls")
+   get_prog_item(Base_URL,Output_File,"IrnssSatControls")
+   get_prog_item(Base_URL,Output_File,"Tracking")
+   get_prog_item(Base_URL,Output_File,"Antenna")
+   get_prog_item(Base_URL,Output_File,"MultipathReject")
+   get_prog_item(Base_URL,Output_File,"RefStation")
+   get_prog_item(Base_URL,Output_File,"RtkControls")
+#   get_prog_item(Base_URL,Output_File,"PPS")
+#   get_prog_item(Base_URL,Output_File,"NtpServer") Set only today
+#   get_prog_item(Base_URL,Output_File,"Autodelete")
+   get_all_sessions(Base_URL,Output_File)
+   get_all_ports(Base_URL,Output_File)
 
 
 def Backup_Receiver_TestMode_Only(Host,Port,User,Password,TLS):
@@ -231,7 +233,7 @@ def Backup_Receiver_TestMode_Only(Host,Port,User,Password,TLS):
    get_prog_item(Base_URL,"Omnistar")
    get_prog_item(Base_URL,"SystemMode")
    get_prog_item(Base_URL,"HeadingControls")
-   get_prog_item(Base_URL,"sessions")
+#   get_prog_item(Base_URL,"sessions")
 
 
 def set_URL(Base_URL,item):
@@ -246,7 +248,7 @@ def set_URL(Base_URL,item):
 def set_prog_item (Base_URL,item):
    r=requests.get(set_URL(Base_URL,item))
    if Verbose >= 1:
-      print r.text.rstrip()
+      print (r.text.rstrip())
    return True
 
 
@@ -285,6 +287,9 @@ def Restore_Receiver(Host,Port,User,Password,TLS,Restore_File,TestMode,TestMode_
 #         print line
 #         match=re.match('Antenna type=(\d+) name=".+" height=([0-9.]+) measMethod=(\w+) serial="(\w+)"',line)
          match=re.match('Antenna type=(\d+) name=".*" height=([0-9.]+) measMethod=(\w+) serial="(.*)"',line)
+         if not match:
+           match=re.match("Antenna type=(\d+) name='.*' height=([0-9.]+) measMethod=(\w+) serial='(.*)'",line)
+#
          if match:
 #            print "matched"
             set_antenna="Antenna&type={}&height={}&measMethod={}&serial={}".format(
@@ -352,12 +357,12 @@ def Unset_TestMode(Host,Port,User,Password,TLS):
 #   print r.text.rstrip()
 
 
-(Host,Port,User,Password,TLS,Verbose,Restore,Restore_File,TestMode,TestMode_Password) = process_args()
+(Host,Port,User,Password,TLS,Verbose,Output_File,Restore,Restore_File,TestMode,TestMode_Password) = process_args()
 
 if Restore:
    Restore_Receiver(Host,Port,User,Password,TLS,Restore_File,TestMode,TestMode_Password)
 else:
-   Backup_Receiver_Standard(Host,Port,User,Password,TLS)
+   Backup_Receiver_Standard(Host,Port,User,Password,TLS,Output_File)
    if In_Test_Mode (Host,Port,User,Password,TLS):
       Backup_Receiver_TestMode_Only(Host,Port,User,Password,TLS)
    else:
