@@ -1,5 +1,5 @@
-#!/usr/bin/env python -u
-from __future__ import print_function
+#!/usr/bin/env python3 -u
+#from __future__ import print_function
 
 import sys
 import argparse
@@ -38,6 +38,8 @@ def process_args():
    Port=args.Port
    TLS=args.TLS
    Verbose=args.Verbose
+   if Verbose==None:
+       Verbose=0
    Restore=args.Restore!=None
    Output_File=args.Output
    Restore_File=args.Restore
@@ -192,7 +194,7 @@ def Backup_Receiver_Standard(Host,Port,User,Password,TLS,Output_File):
    get_prog_item(Base_URL,Output_File,"SystemName")
 
    get_prog_item(Base_URL,Output_File,"PowerControls")
-   get_prog_item(Base_URL,Output_File,"chargingcontrols")
+   get_prog_item(Base_URL,Output_File,"ChargingControls")
    get_prog_item(Base_URL,Output_File,"UPS")
 
    get_prog_item(Base_URL,Output_File,"ReferenceFrequency")
@@ -211,9 +213,10 @@ def Backup_Receiver_Standard(Host,Port,User,Password,TLS,Output_File):
    get_prog_item(Base_URL,Output_File,"MultipathReject")
    get_prog_item(Base_URL,Output_File,"RefStation")
    get_prog_item(Base_URL,Output_File,"RtkControls")
-#   get_prog_item(Base_URL,Output_File,"PPS")
+   get_prog_item(Base_URL,Output_File,"PPS")
+   get_prog_item(Base_URL,Output_File,"AutoReboot")
 #   get_prog_item(Base_URL,Output_File,"NtpServer") Set only today
-#   get_prog_item(Base_URL,Output_File,"Autodelete")
+#   get_prog_item(Base_URL,Output_File,"Autodelete")  Set only today
    get_all_sessions(Base_URL,Output_File)
    get_all_ports(Base_URL,Output_File)
 
@@ -305,10 +308,14 @@ def Restore_Receiver(Host,Port,User,Password,TLS,Restore_File,TestMode,TestMode_
             logging.error("Special antenna handling FAILED")
 
       elif words[0]=="RefStation":
-#         print line
-         match=re.match("RefStation lat=([-0-9.]+) lon=([-0-9.]+) height=([-0-9.]+) Rtcm2Id=(\w+) Rtcm3Id=(\w+) CmrId=(\w+) Name='(.*)' Code='(.*)'",line)
+#         print (line)
+         match=re.match("RefStation lat=([-0-9.]+) lon=([-0-9.]+) height=([-0-9.]+) Rtcm2Id=(\w+) Rtcm3Id=(\w+) CmrId=(\w+) RtxStnId=.* Name='(.*)' Code='(.*)'",line)
+
+         if not match:
+             match=re.match("RefStation lat=([-0-9.]+) lon=([-0-9.]+) height=([-0-9.]+) Rtcm2Id=(\w+) Rtcm3Id=(\w+) CmrId=(\w+) Name='(.*)' Code='(.*)'",line)
+
          if match:
-#            print "matched"
+#            print ("matched")
             set_Ref="RefStation&lat={}&lon={}&height={}&Rtcm2Id={}&Rtcm3Id={}&CmrId={}&Name={}&Code={}".format(
                match.group(1),
                match.group(2),
